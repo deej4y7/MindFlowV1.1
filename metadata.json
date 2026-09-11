@@ -1,0 +1,6 @@
+{
+  "name": "MindFlow",
+  "description": "A wellness-aware academic planning assistant for students, providing deterministic task chunking, capacity calibration, and workload forecasting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

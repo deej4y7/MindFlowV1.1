@@ -1,0 +1,102 @@
+{
+  "entities": {
+    "users": {
+      "collection": "users",
+      "documentId": "userId",
+      "description": "User profile and academic preferences",
+      "fields": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "maxLength": 254 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "academicGoal": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "invariants": [
+        "document ID must equal request.auth.uid",
+        "userId field must equal request.auth.uid",
+        "read access restricted strictly to the user itself (PII isolation)"
+      ]
+    },
+    "tasks": {
+      "collection": "tasks",
+      "documentId": "taskId",
+      "description": "Student academic tasks and coursework commitments",
+      "fields": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "course": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "estimatedMinutes": { "type": "number", "min": 1, "max": 2000 },
+        "remainingMinutes": { "type": "number", "min": 0, "max": 2000 },
+        "priority": { "type": "string", "maxLength": 20 },
+        "deadlineText": { "type": "string", "maxLength": 100 },
+        "dueDate": { "type": "string", "maxLength": 50 },
+        "isFlexible": { "type": "boolean" },
+        "status": { "type": "string", "maxLength": 20 },
+        "cognitiveDemand": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "invariants": [
+        "userId must equal request.auth.uid",
+        "only the authenticated owner can create, read, list, update, and delete their tasks"
+      ]
+    },
+    "wellnessCheckIns": {
+      "collection": "wellnessCheckIns",
+      "documentId": "checkInId",
+      "description": "Student capacity composites and wellness check-in logs",
+      "fields": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "date": { "type": "string", "maxLength": 50 },
+        "wellnessComposite": { "type": "number", "min": 0, "max": 10 },
+        "energy": { "type": "number", "min": 0, "max": 10 },
+        "motivation": { "type": "number", "min": 0, "max": 10 },
+        "accomplishment": { "type": "number", "min": 0, "max": 10 },
+        "sleepHours": { "type": "number", "min": 0, "max": 24 },
+        "academicStress": { "type": "number", "min": 0, "max": 10 },
+        "tier": { "type": "string", "maxLength": 20 },
+        "sessionLengthMinutes": { "type": "number", "min": 10, "max": 120 },
+        "recoveryBreakMinutes": { "type": "number", "min": 2, "max": 30 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "invariants": [
+        "userId must equal request.auth.uid",
+        "only the authenticated student can access their wellness records"
+      ]
+    },
+    "proposals": {
+      "collection": "proposals",
+      "documentId": "proposalId",
+      "description": "Adaptive study proposals and calibrated action cards",
+      "fields": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "sessionLengthMinutes": { "type": "number", "min": 10, "max": 120 },
+        "originalLengthMinutes": { "type": "number", "min": 10, "max": 2000 },
+        "focusTaskId": { "type": "string", "maxLength": 128 },
+        "focusTaskTitle": { "type": "string", "maxLength": 200 },
+        "focusTaskCourse": { "type": "string", "maxLength": 50 },
+        "suggestRecoveryBreak": { "type": "boolean" },
+        "recoveryBreakMinutes": { "type": "number", "min": 2, "max": 30 },
+        "reasoning": { "type": "string", "maxLength": 1000 },
+        "microAction": { "type": "string", "maxLength": 500 },
+        "tier": { "type": "string", "maxLength": 20 },
+        "accepted": { "type": "boolean" },
+        "dismissed": { "type": "boolean" },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "invariants": [
+        "userId must equal request.auth.uid",
+        "student agency guarantee: modifications to accepted state require owner confirmation"
+      ]
+    }
+  }
+}

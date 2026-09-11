@@ -1,0 +1,191 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Common Security Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Entity Validation Helpers
+    function isValidUser(data) {
+      return data.id is string && isValidId(data.id) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.email is string && data.email.size() <= 254 &&
+             data.displayName is string && data.displayName.size() <= 100 &&
+             data.photoURL is string && data.photoURL.size() <= 500 &&
+             data.academicGoal is string && data.academicGoal.size() <= 500 &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidTask(data) {
+      return data.id is string && isValidId(data.id) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             data.course is string && data.course.size() >= 1 && data.course.size() <= 50 &&
+             data.estimatedMinutes is number && data.estimatedMinutes >= 1 && data.estimatedMinutes <= 2000 &&
+             data.remainingMinutes is number && data.remainingMinutes >= 0 && data.remainingMinutes <= 2000 &&
+             data.priority is string && data.priority.size() <= 20 &&
+             data.deadlineText is string && data.deadlineText.size() <= 100 &&
+             data.dueDate is string && data.dueDate.size() <= 50 &&
+             data.isFlexible is bool &&
+             data.status is string && data.status.size() <= 20 &&
+             data.cognitiveDemand is string && data.cognitiveDemand.size() <= 50 &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidWellnessCheckIn(data) {
+      return data.id is string && isValidId(data.id) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.date is string && data.date.size() <= 50 &&
+             data.wellnessComposite is number && data.wellnessComposite >= 0 && data.wellnessComposite <= 10 &&
+             data.energy is number && data.energy >= 0 && data.energy <= 10 &&
+             data.motivation is number && data.motivation >= 0 && data.motivation <= 10 &&
+             data.accomplishment is number && data.accomplishment >= 0 && data.accomplishment <= 10 &&
+             data.sleepHours is number && data.sleepHours >= 0 && data.sleepHours <= 24 &&
+             data.academicStress is number && data.academicStress >= 0 && data.academicStress <= 10 &&
+             data.tier is string && data.tier.size() <= 20 &&
+             data.sessionLengthMinutes is number && data.sessionLengthMinutes >= 10 && data.sessionLengthMinutes <= 120 &&
+             data.recoveryBreakMinutes is number && data.recoveryBreakMinutes >= 2 && data.recoveryBreakMinutes <= 30 &&
+             data.notes is string && data.notes.size() <= 500 &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidProposal(data) {
+      return data.id is string && isValidId(data.id) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.sessionLengthMinutes is number && data.sessionLengthMinutes >= 10 && data.sessionLengthMinutes <= 120 &&
+             data.originalLengthMinutes is number && data.originalLengthMinutes >= 10 && data.originalLengthMinutes <= 2000 &&
+             data.focusTaskId is string && data.focusTaskId.size() <= 128 &&
+             data.focusTaskTitle is string && data.focusTaskTitle.size() <= 200 &&
+             data.focusTaskCourse is string && data.focusTaskCourse.size() <= 50 &&
+             data.suggestRecoveryBreak is bool &&
+             data.recoveryBreakMinutes is number && data.recoveryBreakMinutes >= 2 && data.recoveryBreakMinutes <= 30 &&
+             data.reasoning is string && data.reasoning.size() <= 1000 &&
+             data.microAction is string && data.microAction.size() <= 500 &&
+             data.tier is string && data.tier.size() <= 20 &&
+             data.accepted is bool &&
+             data.dismissed is bool &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    // Users Collection (PII Isolated)
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false; // PII isolation - users can only fetch their own profile document
+      allow create: if isOwner(userId) && isValidId(userId) &&
+                       isValidUser(incoming()) &&
+                       incoming().keys().hasAll(['id', 'userId', 'email', 'displayName', 'photoURL', 'academicGoal', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().size() == 8 &&
+                       incoming().createdAt == request.time &&
+                       incoming().updatedAt == request.time;
+      allow update: if isOwner(userId) && isValidId(userId) &&
+                       isValidUser(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt == request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'academicGoal', 'updatedAt']);
+      allow delete: if isOwner(userId) && isValidId(userId);
+    }
+
+    // Tasks Collection
+    match /tasks/{taskId} {
+      allow get: if isSignedIn() && isValidId(taskId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(taskId) &&
+                       incoming().userId == request.auth.uid &&
+                       isValidTask(incoming()) &&
+                       incoming().keys().hasAll(['id', 'userId', 'title', 'course', 'estimatedMinutes', 'remainingMinutes', 'priority', 'deadlineText', 'dueDate', 'isFlexible', 'status', 'cognitiveDemand', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().size() == 14 &&
+                       incoming().createdAt == request.time &&
+                       incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidId(taskId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == request.auth.uid &&
+                       isValidTask(incoming()) &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt == request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title', 'course', 'estimatedMinutes', 'remainingMinutes',
+                         'priority', 'deadlineText', 'dueDate', 'isFlexible', 'status',
+                         'cognitiveDemand', 'updatedAt'
+                       ]);
+      allow delete: if isSignedIn() && isValidId(taskId) && existing().userId == request.auth.uid;
+    }
+
+    // Wellness Check-Ins Collection
+    match /wellnessCheckIns/{checkInId} {
+      allow get: if isSignedIn() && isValidId(checkInId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(checkInId) &&
+                       incoming().userId == request.auth.uid &&
+                       isValidWellnessCheckIn(incoming()) &&
+                       incoming().keys().hasAll(['id', 'userId', 'date', 'wellnessComposite', 'energy', 'motivation', 'accomplishment', 'sleepHours', 'academicStress', 'tier', 'sessionLengthMinutes', 'recoveryBreakMinutes', 'notes', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().size() == 15 &&
+                       incoming().createdAt == request.time &&
+                       incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidId(checkInId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == request.auth.uid &&
+                       isValidWellnessCheckIn(incoming()) &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt == request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'date', 'wellnessComposite', 'energy', 'motivation',
+                         'accomplishment', 'sleepHours', 'academicStress', 'tier',
+                         'sessionLengthMinutes', 'recoveryBreakMinutes', 'notes',
+                         'updatedAt'
+                       ]);
+      allow delete: if isSignedIn() && isValidId(checkInId) && existing().userId == request.auth.uid;
+    }
+
+    // Adaptive Proposals Collection
+    match /proposals/{proposalId} {
+      allow get: if isSignedIn() && isValidId(proposalId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(proposalId) &&
+                       incoming().userId == request.auth.uid &&
+                       isValidProposal(incoming()) &&
+                       incoming().keys().hasAll(['id', 'userId', 'sessionLengthMinutes', 'originalLengthMinutes', 'focusTaskId', 'focusTaskTitle', 'focusTaskCourse', 'suggestRecoveryBreak', 'recoveryBreakMinutes', 'reasoning', 'microAction', 'tier', 'accepted', 'dismissed', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().size() == 16 &&
+                       incoming().createdAt == request.time &&
+                       incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidId(proposalId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == request.auth.uid &&
+                       isValidProposal(incoming()) &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt == request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'accepted', 'dismissed', 'sessionLengthMinutes', 'suggestRecoveryBreak',
+                         'recoveryBreakMinutes', 'reasoning', 'microAction', 'tier', 'updatedAt'
+                       ]);
+      allow delete: if isSignedIn() && isValidId(proposalId) && existing().userId == request.auth.uid;
+    }
+  }
+}
